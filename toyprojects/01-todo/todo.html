@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>간단 TODO</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 400px;
+      margin: 2rem auto;
+      padding: 0 1rem;
+    }
+    h1 { font-size: 1.25rem; margin-bottom: 1rem; }
+    input[type="text"] {
+      width: 100%;
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 0.5rem 1rem;
+      border: 1px solid #666;
+      border-radius: 4px;
+      background: #f5f5f5;
+      cursor: pointer;
+    }
+    button:hover { background: #eee; }
+    .login-section, .todo-section { margin-bottom: 1.5rem; }
+    .todo-section { display: none; }
+    .todo-section.visible { display: block; }
+    .todo-item {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 0;
+      border-bottom: 1px solid #eee;
+    }
+    .todo-item.done .todo-text { text-decoration: line-through; color: #888; }
+    .todo-text { flex: 1; }
+    .todo-list { list-style: none; padding: 0; margin: 0; }
+    .user-info { font-size: 0.875rem; color: #666; margin-bottom: 0.5rem; }
+    .logout { font-size: 0.75rem; margin-left: 0.5rem; }
+  </style>
+</head>
+<body>
+  <h1>간단 TODO</h1>
+
+  <div class="login-section" id="loginSection">
+    <input type="text" id="usernameInput" placeholder="사용자 이름 입력" />
+    <button type="button" id="loginBtn">시작하기</button>
+  </div>
+
+  <div class="todo-section" id="todoSection">
+    <div class="user-info">
+      <span id="currentUserLabel"></span>
+      <button type="button" class="logout" id="logoutBtn">로그아웃</button>
+    </div>
+    <input type="text" id="newTodoInput" placeholder="새 TODO 입력" />
+    <button type="button" id="addBtn">추가</button>
+    <ul class="todo-list" id="todoList"></ul>
+  </div>
+
+  <script>
+    const STORAGE_KEY_USER = 'todo_current_user';
+    const STORAGE_KEY_TODOS = 'todo_list_';
+
+    function getCurrentUser() {
+      return localStorage.getItem(STORAGE_KEY_USER) || '';
+    }
+
+    function setCurrentUser(name) {
+      if (name) localStorage.setItem(STORAGE_KEY_USER, name.trim());
+      else localStorage.removeItem(STORAGE_KEY_USER);
+    }
+
+    function getTodosForUser(user) {
+      const raw = localStorage.getItem(STORAGE_KEY_TODOS + user);
+      return raw ? JSON.parse(raw) : [];
+    }
+
+    function saveTodosForUser(user, todos) {
+      localStorage.setItem(STORAGE_KEY_TODOS + user, JSON.stringify(todos));
+    }
+
+    function render() {
+      const user = getCurrentUser();
+      const loginSection = document.getElementById('loginSection');
+      const todoSection = document.getElementById('todoSection');
+
+      if (!user) {
+        loginSection.style.display = 'block';
+        todoSection.classList.remove('visible');
+        return;
+      }
+
+      loginSection.style.display = 'none';
+      todoSection.classList.add('visible');
+      document.getElementById('currentUserLabel').textContent = user + '님';
+
+      const todos = getTodosForUser(user);
+      const list = document.getElementById('todoList');
+      list.innerHTML = todos.map(function (item) {
+        return (
+          '<li class="todo-item' + (item.done ? ' done' : '') + '" data-id="' + item.id + '">' +
+          '<input type="checkbox" ' + (item.done ? 'checked' : '') + ' />' +
+          '<span class="todo-text">' + escapeHtml(item.text) + '</span>' +
+          '<button type="button" class="delete-btn">삭제</button>' +
+          '</li>'
+        );
+      }).join('');
+
+      list.querySelectorAll('.todo-item').forEach(function (li) {
+        const id = li.dataset.id;
+        li.querySelector('input[type="checkbox"]').addEventListener('change', function () {
+          toggleTodo(user, id);
+        });
+        li.querySelector('.delete-btn').addEventListener('click', function () {
+          deleteTodo(user, id);
+        });
+      });
+    }
+
+    function escapeHtml(s) {
+      const div = document.createElement('div');
+      div.textContent = s;
+      return div.innerHTML;
+    }
+
+    function toggleTodo(user, id) {
+      const todos = getTodosForUser(user);
+      const item = todos.find(function (t) { return t.id === id; });
+      if (item) {
+        item.done = !item.done;
+        saveTodosForUser(user, todos);
+        render();
+      }
+    }
+
+    function deleteTodo(user, id) {
+      const todos = getTodosForUser(user).filter(function (t) { return t.id !== id; });
+      saveTodosForUser(user, todos);
+      render();
+    }
+
+    function addTodo(user, text) {
+      const trimmed = (text || '').trim();
+      if (!trimmed) return;
+      const todos = getTodosForUser(user);
+      const id = Date.now().toString();
+      todos.push({ id: id, text: trimmed, done: false });
+      saveTodosForUser(user, todos);
+      render();
+      document.getElementById('newTodoInput').value = '';
+    }
+
+    document.getElementById('loginBtn').addEventListener('click', function () {
+      const name = document.getElementById('usernameInput').value.trim();
+      if (!name) return;
+      setCurrentUser(name);
+      document.getElementById('usernameInput').value = '';
+      render();
+    });
+
+    document.getElementById('usernameInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') document.getElementById('loginBtn').click();
+    });
+
+    document.getElementById('logoutBtn').addEventListener('click', function () {
+      setCurrentUser('');
+      render();
+    });
+
+    document.getElementById('addBtn').addEventListener('click', function () {
+      addTodo(getCurrentUser(), document.getElementById('newTodoInput').value);
+    });
+
+    document.getElementById('newTodoInput').addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') addTodo(getCurrentUser(), this.value);
+    });
+
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,909 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tetris - 바닐라 JavaScript</title>
+  <style>
+    /* ===== 기본 스타일 ===== */
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+      color: #e8e8e8;
+    }
+
+    /* ===== 게임 컨테이너 ===== */
+    .game-container {
+      display: flex;
+      gap: 30px;
+      flex-wrap: wrap;
+      justify-content: center;
+      align-items: flex-start;
+    }
+
+    /* ===== 게임 보드 (CSS Grid) ===== */
+    .game-board {
+      display: grid;
+      grid-template-columns: repeat(10, 1fr);
+      grid-template-rows: repeat(20, 1fr);
+      gap: 2px;
+      width: 300px;
+      height: 600px;
+      background: rgba(0, 0, 0, 0.5);
+      padding: 8px;
+      border-radius: 8px;
+      border: 3px solid #e94560;
+      box-shadow: 0 0 30px rgba(233, 69, 96, 0.3);
+    }
+
+    .cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: rgba(30, 30, 50, 0.8);
+      border-radius: 2px;
+      transition: background 0.1s ease, box-shadow 0.1s ease;
+    }
+
+    .cell.filled {
+      border-radius: 3px;
+      box-shadow: inset 0 0 5px rgba(255, 255, 255, 0.3);
+    }
+
+    /* 테트로미노 색상 */
+    .cell.I { background: #00f5ff; }
+    .cell.O { background: #fff700; }
+    .cell.T { background: #bf00ff; }
+    .cell.S { background: #00ff00; }
+    .cell.Z { background: #ff0000; }
+    .cell.J { background: #0055ff; }
+    .cell.L { background: #ff8800; }
+
+    /* ===== 사이드 패널 ===== */
+    .side-panel {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      min-width: 150px;
+    }
+
+    .panel-box {
+      background: rgba(0, 0, 0, 0.4);
+      padding: 15px;
+      border-radius: 8px;
+      border: 2px solid rgba(233, 69, 96, 0.5);
+    }
+
+    .panel-box h3 {
+      font-size: 14px;
+      color: #e94560;
+      margin-bottom: 8px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .panel-box .value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+    }
+
+    /* 다음 블록 미리보기 */
+    .next-block-preview {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      grid-template-rows: repeat(4, 1fr);
+      gap: 2px;
+      width: 80px;
+      height: 80px;
+      margin: 0 auto;
+    }
+
+    .preview-cell {
+      width: 100%;
+      aspect-ratio: 1;
+      background: rgba(30, 30, 50, 0.8);
+      border-radius: 2px;
+    }
+
+    .preview-cell.filled {
+      border-radius: 3px;
+    }
+
+    /* ===== 게임 오버/일시정지 오버레이 ===== */
+    .overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.85);
+      border-radius: 8px;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+    }
+
+    .overlay.visible {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .overlay h2 {
+      font-size: 32px;
+      margin-bottom: 15px;
+      color: #e94560;
+      text-shadow: 0 0 20px rgba(233, 69, 96, 0.5);
+    }
+
+    .overlay p {
+      font-size: 16px;
+      margin-bottom: 20px;
+      color: #aaa;
+    }
+
+    .btn {
+      padding: 12px 30px;
+      font-size: 16px;
+      font-weight: bold;
+      border: none;
+      border-radius: 6px;
+      background: #e94560;
+      color: white;
+      cursor: pointer;
+      transition: transform 0.2s, background 0.2s;
+    }
+
+    .btn:hover {
+      background: #ff6b6b;
+      transform: scale(1.05);
+    }
+
+    /* ===== 게임 보드 래퍼 (오버레이 위치용) ===== */
+    .board-wrapper {
+      position: relative;
+    }
+
+    /* ===== 반응형 디자인 ===== */
+    @media (max-width: 500px) {
+      .game-board {
+        width: 250px;
+        height: 500px;
+      }
+
+      .overlay h2 {
+        font-size: 24px;
+      }
+    }
+
+    /* ===== 라인 클리어 애니메이션 ===== */
+    .cell.clear-animation {
+      animation: lineClear 0.3s ease-out forwards;
+    }
+
+    @keyframes lineClear {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.5; transform: scale(1.1); }
+      100% { opacity: 0; transform: scale(0.5); }
+    }
+
+    /* ===== 게임 시작 화면 ===== */
+    .start-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 25px;
+      padding: 40px;
+      background: rgba(0, 0, 0, 0.4);
+      border-radius: 12px;
+      border: 2px solid rgba(233, 69, 96, 0.5);
+    }
+
+    .start-screen h1 {
+      font-size: 2.5rem;
+      color: #e94560;
+      margin: 0;
+    }
+
+    .start-screen input {
+      width: 220px;
+      padding: 12px 16px;
+      font-size: 16px;
+      border: 2px solid rgba(233, 69, 96, 0.5);
+      border-radius: 6px;
+      background: rgba(30, 30, 50, 0.9);
+      color: #e8e8e8;
+      outline: none;
+    }
+
+    .start-screen input::placeholder {
+      color: #888;
+    }
+
+    .start-screen input:focus {
+      border-color: #e94560;
+    }
+
+    .start-screen .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      width: 100%;
+      max-width: 220px;
+    }
+
+    .start-screen .btn-group .btn-secondary {
+      background: rgba(233, 69, 96, 0.3);
+      border: 2px solid #e94560;
+    }
+
+    .start-screen .btn-group .btn-secondary:hover {
+      background: rgba(233, 69, 96, 0.5);
+    }
+
+    /* ===== 랭킹 모달 ===== */
+    .ranking-modal {
+      position: fixed;
+      z-index: 1000;
+      border-radius: 12px;
+      border: 2px solid rgba(233, 69, 96, 0.5);
+    }
+
+    .ranking-modal .ranking-content {
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .ranking-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 20px;
+    }
+
+    .ranking-table th,
+    .ranking-table td {
+      padding: 10px 16px;
+      text-align: left;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .ranking-table th {
+      color: #e94560;
+      font-size: 14px;
+    }
+
+    .ranking-table tr:hover {
+      background: rgba(233, 69, 96, 0.1);
+    }
+
+    .ranking-empty {
+      color: #888;
+      padding: 20px;
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <!-- 게임 시작 화면 -->
+  <div id="startScreen" class="start-screen">
+    <h1>TETRIS</h1>
+    <input type="text" id="nicknameInput" placeholder="닉네임을 입력하세요" maxlength="20" autocomplete="username">
+    <div class="btn-group">
+      <button class="btn" id="startBtn">게임 시작</button>
+      <button class="btn btn-secondary" id="rankingBtn">랭킹 보기</button>
+    </div>
+  </div>
+
+  <!-- 게임 영역 -->
+  <div id="gameArea" class="game-area" style="display: none;">
+    <h1 style="margin-bottom: 20px; color: #e94560; font-size: 2.5rem;">TETRIS</h1>
+
+  <div class="game-container">
+    <div class="board-wrapper">
+      <div class="game-board" id="gameBoard"></div>
+      <div class="overlay" id="gameOverOverlay">
+        <h2>Game Over</h2>
+        <p>최종 점수: <span id="finalScore">0</span></p>
+        <div style="display: flex; gap: 12px; flex-wrap: wrap; justify-content: center;">
+          <button class="btn" id="restartBtn">다시 시작</button>
+          <button class="btn btn-secondary" id="mainBtn">메인으로</button>
+        </div>
+      </div>
+      <div class="overlay" id="pauseOverlay">
+        <h2>일시정지</h2>
+        <p>계속하려면 P 키를 누르세요</p>
+      </div>
+    </div>
+
+    <div class="side-panel">
+      <div class="panel-box">
+        <h3>점수</h3>
+        <div class="value" id="score">0</div>
+      </div>
+      <div class="panel-box">
+        <h3>레벨</h3>
+        <div class="value" id="level">1</div>
+      </div>
+      <div class="panel-box">
+        <h3>라인</h3>
+        <div class="value" id="lines">0</div>
+      </div>
+      <div class="panel-box">
+        <h3>다음 블록</h3>
+        <div class="next-block-preview" id="nextBlockPreview"></div>
+      </div>
+      <div class="panel-box">
+        <p style="font-size: 12px; color: #888; line-height: 1.6;">
+          ← → 이동<br>
+          ↑ Z 회전<br>
+          ↓ 빠른 낙하<br>
+          Space 하드드롭<br>
+          P 일시정지
+        </p>
+      </div>
+    </div>
+  </div>
+  </div>
+
+  <!-- 랭킹 모달 -->
+  <div id="rankingModal" class="overlay ranking-modal">
+    <div class="ranking-content">
+      <h2>랭킹 보드</h2>
+      <table class="ranking-table">
+        <thead>
+          <tr>
+            <th>순위</th>
+            <th>닉네임</th>
+            <th>점수</th>
+            <th>날짜</th>
+          </tr>
+        </thead>
+        <tbody id="rankingBody">
+        </tbody>
+      </table>
+      <div id="rankingEmpty" class="ranking-empty" style="display: none;">아직 기록이 없습니다.</div>
+      <button class="btn" id="backFromRankingBtn">돌아가기</button>
+    </div>
+  </div>
+
+  <script>
+    /**
+     * ===== 테트리스 게임 - 바닐라 JavaScript =====
+     * 단일 HTML 파일로 구성된 완전한 테트리스 게임
+     *
+     * 데이터 모델:
+     * - gameState.board: 10x20 2차원 배열 (고정된 블록)
+     * - gameState.currentBlock: 현재 블록 { type, x, y, rotation }
+     * - gameState.nextBlock: 다음 블록 미리보기
+     * - gameState: 점수, 레벨, 라인, 상태(playing/paused/gameOver)
+     */
+
+    // ===== 상수 정의 =====
+    const COLS = 10;
+    const ROWS = 20;
+    const BLOCK_SIZE = 30;
+
+    // 테트로미노 형태 정의 [타입][회전상태][y][x]
+    // 각 블록은 4x4 그리드 내에서 1로 표시된 위치
+    const SHAPES = {
+      I: [
+        [[0,0,0,0], [1,1,1,1], [0,0,0,0], [0,0,0,0]],
+        [[0,0,1,0], [0,0,1,0], [0,0,1,0], [0,0,1,0]],
+        [[0,0,0,0], [0,0,0,0], [1,1,1,1], [0,0,0,0]],
+        [[0,1,0,0], [0,1,0,0], [0,1,0,0], [0,1,0,0]]
+      ],
+      O: [
+        [[1,1], [1,1]],
+        [[1,1], [1,1]],
+        [[1,1], [1,1]],
+        [[1,1], [1,1]]
+      ],
+      T: [
+        [[0,1,0], [1,1,1], [0,0,0]],
+        [[0,1,0], [0,1,1], [0,1,0]],
+        [[0,0,0], [1,1,1], [0,1,0]],
+        [[0,1,0], [1,1,0], [0,1,0]]
+      ],
+      S: [
+        [[0,1,1], [1,1,0], [0,0,0]],
+        [[0,1,0], [0,1,1], [0,0,1]],
+        [[0,0,0], [0,1,1], [1,1,0]],
+        [[1,0,0], [1,1,0], [0,1,0]]
+      ],
+      Z: [
+        [[1,1,0], [0,1,1], [0,0,0]],
+        [[0,0,1], [0,1,1], [0,1,0]],
+        [[0,0,0], [1,1,0], [0,1,1]],
+        [[0,1,0], [1,1,0], [1,0,0]]
+      ],
+      J: [
+        [[1,0,0], [1,1,1], [0,0,0]],
+        [[0,1,1], [0,1,0], [0,1,0]],
+        [[0,0,0], [1,1,1], [0,0,1]],
+        [[0,1,0], [0,1,0], [1,1,0]]
+      ],
+      L: [
+        [[0,0,1], [1,1,1], [0,0,0]],
+        [[0,1,0], [0,1,0], [0,1,1]],
+        [[0,0,0], [1,1,1], [1,0,0]],
+        [[1,1,0], [0,1,0], [0,1,0]]
+      ]
+    };
+
+    const TETROMINO_TYPES = ['I', 'O', 'T', 'S', 'Z', 'J', 'L'];
+
+    // 벽 킥 오프셋 (시계방향 회전 시 x 위치 조정 시도)
+    const WALL_KICK_OFFSETS = [
+      { x: 0, y: 0 },
+      { x: -1, y: 0 },
+      { x: 1, y: 0 },
+      { x: -2, y: 0 },
+      { x: 2, y: 0 }
+    ];
+
+    // 레벨별 낙하 속도 (ms)
+    const getDropInterval = (level) => Math.max(100, 1000 - (level - 1) * 100);
+
+    // 라인 클리어 점수
+    const LINE_SCORES = [0, 100, 300, 500, 800];
+
+    // ===== 앱/화면 상태 =====
+    let appState = 'start';  // start | playing | gameOver
+    let currentUser = { nickname: '' };  // sessionStorage에 저장
+
+    const RANKING_KEY = 'tetris_rankings';
+    const USER_KEY = 'tetris_user';
+    const MAX_RANKINGS = 10;
+
+    // ===== 게임 상태 =====
+    let gameState = {
+      board: [],           // 10x20 2차원 배열
+      currentBlock: null,  // { type, x, y, rotation }
+      nextBlock: null,     // { type }
+      score: 0,
+      level: 1,
+      lines: 0,
+      state: 'playing',    // playing | paused | gameOver
+      lastDrop: 0,
+      dropInterval: 1000
+    };
+
+    // ===== DOM 요소 =====
+    const startScreen = document.getElementById('startScreen');
+    const gameArea = document.getElementById('gameArea');
+    const nicknameInput = document.getElementById('nicknameInput');
+    const startBtn = document.getElementById('startBtn');
+    const rankingBtn = document.getElementById('rankingBtn');
+    const rankingModal = document.getElementById('rankingModal');
+    const rankingBody = document.getElementById('rankingBody');
+    const rankingEmpty = document.getElementById('rankingEmpty');
+    const backFromRankingBtn = document.getElementById('backFromRankingBtn');
+    const mainBtn = document.getElementById('mainBtn');
+    const gameBoard = document.getElementById('gameBoard');
+    const nextBlockPreview = document.getElementById('nextBlockPreview');
+    const scoreEl = document.getElementById('score');
+    const levelEl = document.getElementById('level');
+    const linesEl = document.getElementById('lines');
+    const gameOverOverlay = document.getElementById('gameOverOverlay');
+    const pauseOverlay = document.getElementById('pauseOverlay');
+    const finalScoreEl = document.getElementById('finalScore');
+    const restartBtn = document.getElementById('restartBtn');
+
+    // ===== 화면 전환 =====
+    function showStartScreen() {
+      appState = 'start';
+      startScreen.style.display = 'flex';
+      gameArea.style.display = 'none';
+      rankingModal.classList.remove('visible');
+    }
+
+    function showGameArea() {
+      appState = 'playing';
+      startScreen.style.display = 'none';
+      gameArea.style.display = 'flex';
+      gameArea.style.flexDirection = 'column';
+      gameArea.style.alignItems = 'center';
+    }
+
+    // ===== 로그인 (닉네임) =====
+    function handleLogin() {
+      const nickname = nicknameInput.value.trim();
+      if (!nickname) {
+        alert('닉네임을 입력해주세요.');
+        nicknameInput.focus();
+        return;
+      }
+      currentUser.nickname = nickname;
+      sessionStorage.setItem(USER_KEY, nickname);
+      showGameArea();
+      startGame();
+    }
+
+    // ===== 랭킹 =====
+    function getRankings() {
+      try {
+        const data = localStorage.getItem(RANKING_KEY);
+        return data ? JSON.parse(data) : [];
+      } catch {
+        return [];
+      }
+    }
+
+    function saveToRanking(nickname, score) {
+      const rankings = getRankings();
+      rankings.push({
+        nickname: nickname || '익명',
+        score: score,
+        date: new Date().toISOString()
+      });
+      rankings.sort((a, b) => b.score - a.score);
+      const top = rankings.slice(0, MAX_RANKINGS);
+      localStorage.setItem(RANKING_KEY, JSON.stringify(top));
+    }
+
+    function formatDate(isoString) {
+      const d = new Date(isoString);
+      return d.toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+    }
+
+    function showRankingModal() {
+      const rankings = getRankings();
+      rankingBody.innerHTML = '';
+      if (rankings.length === 0) {
+        rankingEmpty.style.display = 'block';
+      } else {
+        rankingEmpty.style.display = 'none';
+        rankings.forEach((r, i) => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `<td>${i + 1}</td><td>${r.nickname}</td><td>${r.score.toLocaleString()}</td><td>${formatDate(r.date)}</td>`;
+          rankingBody.appendChild(tr);
+        });
+      }
+      rankingModal.classList.add('visible');
+    }
+
+    function hideRankingModal() {
+      rankingModal.classList.remove('visible');
+    }
+
+    // ===== 보드 초기화 =====
+    function initBoard() {
+      gameState.board = Array(ROWS).fill(null).map(() => Array(COLS).fill(null));
+    }
+
+    // ===== 랜덤 테트로미노 생성 =====
+    function getRandomTetromino() {
+      const type = TETROMINO_TYPES[Math.floor(Math.random() * TETROMINO_TYPES.length)];
+      return { type, x: Math.floor(COLS / 2) - Math.floor(SHAPES[type][0][0].length / 2), y: 0, rotation: 0 };
+    }
+
+    // ===== 블록 형태 가져오기 =====
+    function getBlockShape(block) {
+      return SHAPES[block.type][block.rotation];
+    }
+
+    // ===== 충돌 감지 =====
+    function checkCollision(block, offsetX = 0, offsetY = 0) {
+      const shape = getBlockShape(block);
+      for (let y = 0; y < shape.length; y++) {
+        for (let x = 0; x < shape[y].length; x++) {
+          if (shape[y][x]) {
+            const newX = block.x + x + offsetX;
+            const newY = block.y + y + offsetY;
+            if (newX < 0 || newX >= COLS || newY >= ROWS) return true;
+            if (newY >= 0 && gameState.board[newY][newX]) return true;
+          }
+        }
+      }
+      return false;
+    }
+
+    // ===== 블록 회전 (벽 킥 포함) =====
+    function rotateBlock(clockwise = true) {
+      if (gameState.state !== 'playing' || !gameState.currentBlock) return;
+
+      const block = gameState.currentBlock;
+      const newRotation = (block.rotation + (clockwise ? 1 : -1) + 4) % 4;
+      const rotatedBlock = { ...block, rotation: newRotation };
+
+      // 벽 킥 시도
+      for (const offset of WALL_KICK_OFFSETS) {
+        const testBlock = { ...rotatedBlock, x: rotatedBlock.x + offset.x, y: rotatedBlock.y + offset.y };
+        if (!checkCollision(testBlock)) {
+          gameState.currentBlock = testBlock;
+          return;
+        }
+      }
+    }
+
+    // ===== 블록 이동 =====
+    function moveBlock(dx, dy) {
+      if (gameState.state !== 'playing' || !gameState.currentBlock) return false;
+      if (!checkCollision(gameState.currentBlock, dx, dy)) {
+        gameState.currentBlock.x += dx;
+        gameState.currentBlock.y += dy;
+        return true;
+      }
+      return false;
+    }
+
+    // ===== 하드 드롭 (바닥까지 즉시 떨어뜨리기) =====
+    function hardDrop() {
+      if (gameState.state !== 'playing' || !gameState.currentBlock) return;
+
+      while (moveBlock(0, 1)) {
+        gameState.score += 2; // 하드 드롭 보너스
+      }
+      lockBlock();
+    }
+
+    // ===== 블록 고정 및 다음 블록 생성 =====
+    function lockBlock() {
+      const block = gameState.currentBlock;
+      const shape = getBlockShape(block);
+
+      for (let y = 0; y < shape.length; y++) {
+        for (let x = 0; x < shape[y].length; x++) {
+          if (shape[y][x]) {
+            const boardY = block.y + y;
+            const boardX = block.x + x;
+            if (boardY >= 0) {
+              gameState.board[boardY][boardX] = block.type;
+            }
+          }
+        }
+      }
+
+      // 라인 클리어 처리
+      const clearedLines = clearLines();
+      if (clearedLines > 0) {
+        gameState.score += LINE_SCORES[clearedLines] * gameState.level;
+        gameState.lines += clearedLines;
+        gameState.level = Math.floor(gameState.lines / 10) + 1;
+        gameState.dropInterval = getDropInterval(gameState.level);
+      }
+
+      // 다음 블록 생성
+      spawnNewBlock();
+    }
+
+    // ===== 라인 클리어 =====
+    function clearLines() {
+      let cleared = 0;
+      const linesToClear = [];
+
+      for (let y = ROWS - 1; y >= 0; y--) {
+        if (gameState.board[y].every(cell => cell !== null)) {
+          linesToClear.push(y);
+          cleared++;
+        }
+      }
+
+      if (cleared === 0) return 0;
+
+      // 클리어할 라인 제거 및 위에서 내리기
+      for (const line of linesToClear) {
+        gameState.board.splice(line, 1);
+        gameState.board.unshift(Array(COLS).fill(null));
+      }
+
+      return cleared;
+    }
+
+    // ===== 새 블록 생성 =====
+    function spawnNewBlock() {
+      gameState.currentBlock = gameState.nextBlock
+        ? { ...gameState.nextBlock, x: Math.floor(COLS / 2) - Math.floor(SHAPES[gameState.nextBlock.type][0][0].length / 2), y: 0, rotation: 0 }
+        : getRandomTetromino();
+      gameState.nextBlock = getRandomTetromino();
+
+      // 게임 오버 체크
+      if (checkCollision(gameState.currentBlock)) {
+        gameState.state = 'gameOver';
+        appState = 'gameOver';
+        const nickname = sessionStorage.getItem(USER_KEY) || currentUser.nickname;
+        saveToRanking(nickname, gameState.score);
+        gameOverOverlay.classList.add('visible');
+        finalScoreEl.textContent = gameState.score;
+      }
+    }
+
+    // ===== 일시정지 =====
+    function togglePause() {
+      if (gameState.state === 'gameOver') return;
+      if (gameState.state === 'paused') {
+        gameState.state = 'playing';
+        pauseOverlay.classList.remove('visible');
+      } else {
+        gameState.state = 'paused';
+        pauseOverlay.classList.add('visible');
+      }
+    }
+
+    // ===== 게임 시작/재시작 =====
+    function startGame() {
+      initBoard();
+      gameState = {
+        board: Array(ROWS).fill(null).map(() => Array(COLS).fill(null)),
+        currentBlock: null,
+        nextBlock: getRandomTetromino(),
+        score: 0,
+        level: 1,
+        lines: 0,
+        state: 'playing',
+        lastDrop: 0,
+        dropInterval: 1000
+      };
+      gameOverOverlay.classList.remove('visible');
+      pauseOverlay.classList.remove('visible');
+      spawnNewBlock();
+      updateUI();
+    }
+
+    // ===== UI 업데이트 =====
+    function updateUI() {
+      scoreEl.textContent = gameState.score;
+      levelEl.textContent = gameState.level;
+      linesEl.textContent = gameState.lines;
+
+      // 다음 블록 미리보기
+      nextBlockPreview.innerHTML = '';
+      for (let i = 0; i < 16; i++) {
+        const cell = document.createElement('div');
+        cell.className = 'preview-cell';
+        nextBlockPreview.appendChild(cell);
+      }
+      if (gameState.nextBlock) {
+        const shape = SHAPES[gameState.nextBlock.type][0];
+        const offsetX = (4 - shape[0].length) / 2;
+        const offsetY = (4 - shape.length) / 2;
+        for (let y = 0; y < shape.length; y++) {
+          for (let x = 0; x < shape[y].length; x++) {
+            if (shape[y][x]) {
+              const idx = Math.floor(offsetY + y) * 4 + Math.floor(offsetX + x);
+              nextBlockPreview.children[idx].classList.add('filled', gameState.nextBlock.type);
+            }
+          }
+        }
+      }
+    }
+
+    // ===== 게임 보드 렌더링 =====
+    function render() {
+      // 기존 셀 제거 후 재생성 (간단한 렌더링)
+      gameBoard.innerHTML = '';
+      const displayBoard = gameState.board.map(row => [...row]);
+
+      // 현재 블록 합치기
+      if (gameState.currentBlock) {
+        const block = gameState.currentBlock;
+        const shape = getBlockShape(block);
+        for (let y = 0; y < shape.length; y++) {
+          for (let x = 0; x < shape[y].length; x++) {
+            if (shape[y][x]) {
+              const boardY = block.y + y;
+              const boardX = block.x + x;
+              if (boardY >= 0 && boardY < ROWS && boardX >= 0 && boardX < COLS) {
+                displayBoard[boardY][boardX] = block.type;
+              }
+            }
+          }
+        }
+      }
+
+      // 그리드 렌더링
+      for (let y = 0; y < ROWS; y++) {
+        for (let x = 0; x < COLS; x++) {
+          const cell = document.createElement('div');
+          cell.className = 'cell';
+          if (displayBoard[y][x]) {
+            cell.classList.add('filled', displayBoard[y][x]);
+          }
+          gameBoard.appendChild(cell);
+        }
+      }
+    }
+
+    // ===== 게임 루프 =====
+    function gameLoop(timestamp) {
+      if (appState === 'start') {
+        requestAnimationFrame(gameLoop);
+        return;
+      }
+      if (gameState.state === 'playing') {
+        if (timestamp - gameState.lastDrop > gameState.dropInterval) {
+          if (!moveBlock(0, 1)) {
+            lockBlock();
+          }
+          gameState.lastDrop = timestamp;
+        }
+      }
+      // 일시정지/플레이 중 항상 렌더링 (화면 유지)
+      if (gameState.state !== 'gameOver') {
+        render();
+        updateUI();
+      }
+      requestAnimationFrame(gameLoop);
+    }
+
+    // ===== 키보드 이벤트 =====
+    document.addEventListener('keydown', (e) => {
+      if (gameState.state === 'gameOver') {
+        if (e.code === 'Space') startGame();
+        return;
+      }
+
+      switch (e.code) {
+        case 'ArrowLeft':
+          e.preventDefault();
+          moveBlock(-1, 0);
+          break;
+        case 'ArrowRight':
+          e.preventDefault();
+          moveBlock(1, 0);
+          break;
+        case 'ArrowDown':
+          e.preventDefault();
+          if (moveBlock(0, 1)) gameState.score += 1;
+          break;
+        case 'ArrowUp':
+        case 'KeyZ':
+          e.preventDefault();
+          rotateBlock(e.code === 'KeyZ' ? false : true);
+          break;
+        case 'Space':
+          e.preventDefault();
+          hardDrop();
+          break;
+        case 'KeyP':
+          e.preventDefault();
+          togglePause();
+          break;
+      }
+    });
+
+    // ===== 버튼 이벤트 =====
+    startBtn.addEventListener('click', handleLogin);
+    nicknameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter' && !rankingModal.classList.contains('visible')) handleLogin();
+    });
+    rankingBtn.addEventListener('click', () => {
+      showRankingModal();
+    });
+    backFromRankingBtn.addEventListener('click', () => {
+      hideRankingModal();
+    });
+    restartBtn.addEventListener('click', startGame);
+    mainBtn.addEventListener('click', () => {
+      gameOverOverlay.classList.remove('visible');
+      showStartScreen();
+    });
+
+    // 저장된 닉네임 복원
+    const savedNickname = sessionStorage.getItem(USER_KEY);
+    if (savedNickname) {
+      nicknameInput.value = savedNickname;
+      currentUser.nickname = savedNickname;
+    }
+
+    // ===== 초기 진입점 =====
+    showStartScreen();
+    requestAnimationFrame(gameLoop);
+  </script>
+</body>
+</html>
