@@ -1,0 +1,46 @@
+# --- 1. 가상환경 및 의존성 (AI가 읽을 필요 없음) ---
+# 라이브러리 코드는 너무 방대해서 AI의 집중력을 흐립니다.
+.venv/
+env/
+venv/
+node_modules/
+
+# --- 2. 락 파일 (토큰 낭비 주범) ---
+# 패키지 버전 정보는 pyproject.toml만 봐도 충분합니다.
+uv.lock
+pnpm-lock.yaml
+package-lock.json
+
+# --- 3. 캐시 및 빌드 아티팩트 ---
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+build/
+dist/
+*.egg-info/
+
+# --- 4. 데이터 및 미디어 파일 (노이즈 방지) ---
+# 코드를 짜는 게 목적이지, 생성된 이미지나 DB 파일을 읽는 게 목적이 아닙니다.
+*.sqlite
+*.db
+*.csv
+*.json
+*.log
+*.png
+*.jpg
+*.jpeg
+*.gif
+# (단, 개발용 샘플 데이터가 들어있는 폴더는 예외로 하고 싶다면 !data/sample/ 형식으로 제외 가능)
+
+# --- 5. 시스템 및 IDE 설정 ---
+.git/
+.DS_Store
+.idea/
+.vscode/
+
+# --- 6. 비밀 값 (이중 잠금) ---
+# Global Ignore에 있어도 혹시 모르니 한 번 더.
+.env
+.env.*
+secrets.toml
