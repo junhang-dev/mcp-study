@@ -1,0 +1,20 @@
+# .gitignore 파일 생성 및 필수 내용 작성
+cat <<EOF > .gitignore
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+.env
+.env.*
+
+# Cursor / IDE
+.cursor/
+.vscode/
+.idea/
+
+# Mac
+.DS_Store
+
+# Logs
+*.log
+EOF
